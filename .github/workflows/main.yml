@@ -43,16 +43,17 @@ jobs:
         with:
           exclude_inputs: bundle_id,display_name
 
-      - name: Validate IPA URL
+      - name: Download and validate IPA
+        env:
+          IPA_URL: ${{ inputs.ipa_url }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -L -r 0-1023 -o sample.part "${{ inputs.ipa_url }}" > /dev/null 2>&1
-          
-          file_type=$(file --mime-type -b sample.part)
-
-          if [[ "$file_type" != "application/x-ios-app" && "$file_type" != "application/zip" ]]; then
-            echo "::error::Validation failed: The file is not a valid IPA file. Detected type: $file_type."
-            exit 1
+          if [[ "$IPA_URL" == "https://api.github.com/repos/${{ github.repository }}/releases/assets/"* ]]; then
+            curl --fail --location --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$IPA_URL" -o ytm.ipa
+          else
+            curl --fail --location --retry 3 --proto '=https' "$IPA_URL" -o ytm.ipa
           fi
+          unzip -tq ytm.ipa
 
       - name: Install Dependencies
         run: brew install make ldid
@@ -93,9 +94,6 @@ jobs:
       - name: Install cyan
         run: pipx install --force https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
 
-      - name: Download YouTube Music
-        run: wget "${{ inputs.ipa_url }}" --no-verbose -O ytm.ipa
-
       - name: Build Tweak for Sideloading
         run: |
           cd main
@@ -103,7 +101,10 @@ jobs:
           mv packages/*.deb ../ytmult.deb
 
       - name: Inject tweak into provided IPA
-        run: cyan -i ytm.ipa -o YTMusicUltimate.ipa -uwsf ytmult.deb -n "${{ inputs.display_name }}" -b ${{ inputs.bundle_id }} 
+        env:
+          DISPLAY_NAME: ${{ inputs.display_name }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+        run: cyan -i ytm.ipa -o YTMusicUltimate.ipa -uwsf ytmult.deb -n "$DISPLAY_NAME" -b "$BUNDLE_ID"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2.5.0
