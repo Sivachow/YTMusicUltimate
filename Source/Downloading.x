@@ -126,7 +126,9 @@ static BOOL YTMU(NSString *key) {
 
 %new
 - (NSString *)getURLFromManifest:(NSURL *)manifest {
+    if (!manifest) return nil;
     NSData *manifestData = [NSData dataWithContentsOfURL:manifest];
+    if (!manifestData.length) return nil;
     NSString *manifestString = [[NSString alloc] initWithData:manifestData encoding:NSUTF8StringEncoding];
     NSArray *manifestLines = [manifestString componentsSeparatedByString:@"\n"];
 
@@ -138,7 +140,7 @@ static BOOL YTMU(NSString *key) {
                 NSRange startRange = [line rangeOfString:@"https://"];
                 NSRange endRange = [line rangeOfString:@"index.m3u8"];
 
-                if (startRange.location != NSNotFound && endRange.location != NSNotFound) {
+                if (startRange.location != NSNotFound && endRange.location != NSNotFound && endRange.location >= startRange.location) {
                     NSRange targetRange = NSMakeRange(startRange.location, NSMaxRange(endRange) - startRange.location);
                     return [line substringWithRange:targetRange];
                 }
